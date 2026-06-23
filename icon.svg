@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0f766e"/>
+  <rect x="80" y="86" width="160" height="86" rx="43" fill="#e8f7f3"/>
+  <rect x="280" y="86" width="152" height="86" rx="12" fill="#fff"/>
+  <path d="M240 129h40" stroke="#d7fff7" stroke-width="18" stroke-linecap="round"/>
+  <path d="M356 172v68" stroke="#d7fff7" stroke-width="18" stroke-linecap="round"/>
+  <path d="M356 240l-74 74 74 74 74-74z" fill="#fff7ed" stroke="#d7fff7" stroke-width="14"/>
+  <path d="M282 314H178" stroke="#d7fff7" stroke-width="18" stroke-linecap="round"/>
+  <path d="M84 266h150v116c-37 22-77-23-150 10z" fill="#eff6ff"/>
+  <text x="256" y="462" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="800" fill="#fff">SGI</text>
+</svg>

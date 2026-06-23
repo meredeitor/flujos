@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>Flujos SGI</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">SGI</span>
+        <div>
+          <h1>Flujos SGI <span id="appVersion" class="version-badge">v0.1.0</span></h1>
+          <p>Diagramas de flujo para tu proceso</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="installBtn" class="ghost" hidden>Instalar</button>
+        <button id="openRecordBtn" class="ghost">Abrir</button>
+        <button id="saveAsBtn">Guardar como</button>
+        <button id="saveBtn">Guardar cambios</button>
+        <button id="exportPdfBtn" class="ghost">PDF</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <aside class="panel left-panel" aria-label="Herramientas">
+        <section>
+          <h2>Figuras</h2>
+          <div class="tool-grid compact-grid">
+            <button class="shape-tool" data-shape="terminator">Inicio / Fin</button>
+            <button class="shape-tool" data-shape="process">Proceso</button>
+            <button class="shape-tool" data-shape="decision">Decision</button>
+            <button class="shape-tool" data-shape="document">Documento</button>
+            <button class="shape-tool" data-shape="text">Cuadro texto</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Edicion</h2>
+          <div class="action-grid">
+            <button id="selectAreaBtn" class="ghost">Seleccionar</button>
+            <button id="connectBtn">Conectar</button>
+            <button id="copyBtn" class="ghost">Copiar</button>
+            <button id="pasteBtn" class="ghost">Pegar</button>
+            <button id="duplicateBtn" class="ghost">Duplicar</button>
+            <button id="copyImageBtn" class="ghost">Imagen</button>
+          </div>
+          <div class="stack-actions">
+            <button id="deleteBtn" class="wide danger">Eliminar seleccionado</button>
+            <button id="clearBtn" class="wide ghost">Nuevo diagrama</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Encabezado</h2>
+          <label class="check-row">
+            <input id="headerEnabled" type="checkbox" />
+            Mostrar encabezado
+          </label>
+          <input id="headerCompany" type="text" placeholder="Empresa" value="BOTAS CABORCA S.A. DE C.V." />
+          <input id="headerDocument" type="text" placeholder="Documento" value="Documento: Identificacion de Molduras" />
+          <input id="headerResponsible" type="text" placeholder="Responsable" value="Jefe de Implementaciones" />
+          <div class="logo-upload-grid">
+            <label class="file-button logo-upload">
+              Logo izquierdo
+              <input id="headerLeftLogoInput" type="file" accept="image/*" />
+            </label>
+            <label class="file-button logo-upload">
+              Logo derecho
+              <input id="headerRightLogoInput" type="file" accept="image/*" />
+            </label>
+          </div>
+          <div class="field-grid">
+            <input id="headerCode" type="text" placeholder="Codigo" value="FO-DES-032" />
+            <input id="headerDate" type="text" placeholder="Fecha" value="27/05/26" />
+            <input id="headerVersion" type="text" placeholder="Version" value="00" />
+            <input id="headerPeriod" type="text" placeholder="Periodo" value="V - 2026" />
+          </div>
+        </section>
+
+        <section>
+          <h2>Calles</h2>
+          <label class="check-row">
+            <input id="lanesEnabled" type="checkbox" />
+            Mostrar calles
+          </label>
+          <div class="segmented-control" aria-label="Orientacion de calles">
+            <button id="lanesHorizontalBtn" type="button" class="ghost active">Horizontal</button>
+            <button id="lanesVerticalBtn" type="button" class="ghost">Vertical</button>
+          </div>
+          <textarea id="laneNames" rows="4" placeholder="Direccion&#10;Calidad&#10;Produccion"></textarea>
+          <div class="action-grid">
+            <button id="addLaneBtn" class="ghost">Agregar</button>
+            <button id="removeLaneBtn" class="ghost">Quitar</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>Plantillas</h2>
+          <button id="auditTemplateBtn" class="wide ghost">Auditoria interna</button>
+          <button id="ncTemplateBtn" class="wide ghost">No conformidad</button>
+        </section>
+      </aside>
+
+      <section class="canvas-wrap" aria-label="Area de diagrama">
+        <div class="canvas-toolbar">
+          <input id="diagramTitle" type="text" value="Proceso del SGI" aria-label="Titulo del diagrama" />
+          <div class="workspace-tools" aria-label="Controles de vista">
+            <button id="zoomOutBtn" class="icon-button ghost" title="Alejar" aria-label="Alejar">-</button>
+            <span id="zoomLevel" class="zoom-level">100%</span>
+            <button id="zoomInBtn" class="icon-button ghost" title="Acercar" aria-label="Acercar">+</button>
+            <button id="zoomResetBtn" class="ghost">100%</button>
+            <button id="zoomFitBtn" class="ghost">Encajar</button>
+            <button id="fullscreenBtn" class="ghost" title="Pantalla completa" aria-label="Pantalla completa">Pantalla</button>
+          </div>
+          <span id="statusText">Listo</span>
+        </div>
+        <svg id="flowCanvas" viewBox="0 0 1600 1000" role="img" aria-label="Editor de diagrama de flujo">
+          <defs>
+            <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="10" markerHeight="10" orient="auto" markerUnits="strokeWidth">
+              <path d="M 1 1 L 11 6 L 1 11 z" fill="#334155"></path>
+            </marker>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity=".16" />
+            </filter>
+          </defs>
+          <text class="watermark" x="4740" y="3160" text-anchor="end">Desarrollado por: Hermenegildo P&eacute;rez</text>
+          <g id="gridLayer"></g>
+          <g id="headerLayer"></g>
+          <g id="laneLayer"></g>
+          <g id="selectionLayer"></g>
+          <g id="edgeLayer"></g>
+          <g id="nodeLayer"></g>
+        </svg>
+        <div class="watermark-overlay">Desarrollado por: Hermenegildo P&eacute;rez</div>
+      </section>
+
+      <aside class="panel right-panel" aria-label="Propiedades">
+        <section>
+          <h2>Propiedades</h2>
+          <label>
+            Texto
+            <textarea id="nodeText" rows="4" placeholder="Selecciona una figura"></textarea>
+          </label>
+          <label>
+            Responsable
+            <input id="nodeOwner" type="text" placeholder="Ej. Calidad" />
+          </label>
+          <label>
+            Tipo
+            <select id="nodeShape">
+              <option value="terminator">Inicio / Fin</option>
+              <option value="process">Proceso</option>
+              <option value="decision">Decision</option>
+              <option value="document">Documento</option>
+              <option value="text">Cuadro de texto</option>
+            </select>
+          </label>
+        </section>
+
+        <section>
+          <h2>Uso rapido</h2>
+          <p class="hint">Arrastra figuras para moverlas. Usa "Seleccionar area" para copiar varias figuras. Ctrl+C copia, Ctrl+V pega y "Copiar imagen" prepara el flujo para Excel o PowerPoint.</p>
+        </section>
+      </aside>
+    </main>
+
+    <div id="openModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Abrir diagrama</h3>
+
+    <select id="recordsSelect" size="10"></select>
+
+    <div class="modal-actions">
+      <button id="loadRecordBtn">Abrir</button>
+      <button id="closeModalBtn" class="ghost">Cancelar</button>
+    </div>
+  </div>
+</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+    <script type="module" src="firebase-init.js"></script>
+  </body>
+</html>
