@@ -1,6 +1,6 @@
 # Flujos SGI
 
-Version: 0.1.0
+Version: 0.1.5
 
 PWA para crear diagramas de flujo del sistema de gestion de calidad.
 
