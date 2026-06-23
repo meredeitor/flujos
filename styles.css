@@ -472,15 +472,38 @@ select {
 
 .lane-bg {
   fill: rgba(15, 118, 110, .06);
+  pointer-events: none;
 }
 
 .lane-bg-1 {
   fill: rgba(15, 118, 110, .025);
+  pointer-events: none;
 }
 
 .lane-line {
+  pointer-events: none;
   stroke: rgba(15, 118, 110, .24);
   stroke-width: 2;
+}
+
+.lane-resize-handle {
+  opacity: 0;
+  pointer-events: stroke;
+  stroke: #0f766e;
+  stroke-linecap: round;
+  stroke-width: 18;
+}
+
+.lane-resize-handle:hover {
+  opacity: .28;
+}
+
+.lane-resize-vertical {
+  cursor: col-resize;
+}
+
+.lane-resize-horizontal {
+  cursor: row-resize;
 }
 
 .lane-label {

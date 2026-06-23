@@ -27,7 +27,7 @@ const headerLeftLogoInput = document.getElementById("headerLeftLogoInput");
 const headerRightLogoInput = document.getElementById("headerRightLogoInput");
 const appVersionBadge = document.getElementById("appVersion");
 
-const appVersion = "0.1.0";
+const appVersion = "0.1.5";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -57,6 +57,7 @@ let selectedNodeId = null;
 let selectedEdgeId = null;
 let selectedNodeIds = new Set();
 let drag = null;
+let laneResize = null;
 let pan = null;
 let selectBox = null;
 let selectMode = false;
@@ -153,7 +154,7 @@ function makeRoomForHeader() {
   if (minY >= topLimit) return;
   const deltaY = topLimit - minY;
   state.nodes.forEach((node) => {
-    const size = shapeSize[node.shape] || shapeSize.process;
+    const size = getNodeSize(node);
     node.y = clamp(node.y + deltaY, 20, workspace.h - size.h - 20);
   });
 }
@@ -188,6 +189,33 @@ function renderHeader(targetLayer = headerLayer, options = {}) {
   group.appendChild(createSvg("text", { class: "doc-header-period-text", x: x + w - 130, y: y + topH + headerLayout.gap + 46, "text-anchor": "middle" })).textContent = state.header.period;
   targetLayer.appendChild(group);
 }
+function laneTotalSize() {
+  ensureHeader();
+  return state.lanes?.orientation === "vertical" ? workspace.w : workspace.h - headerReservedHeight();
+}
+
+function normalizeLaneSizes() {
+  const total = laneTotalSize();
+  const count = state.lanes.names.length;
+  const current = Array.isArray(state.lanes.sizes) ? state.lanes.sizes.map(Number).filter((size) => Number.isFinite(size) && size > 0) : [];
+  if (current.length !== count) {
+    state.lanes.sizes = Array.from({ length: count }, () => total / count);
+    return;
+  }
+  const sum = current.reduce((acc, size) => acc + size, 0);
+  state.lanes.sizes = sum > 0 ? current.map((size) => (size / sum) * total) : Array.from({ length: count }, () => total / count);
+}
+
+function laneStarts() {
+  normalizeLaneSizes();
+  const starts = [];
+  state.lanes.sizes.reduce((offset, size) => {
+    starts.push(offset);
+    return offset + size;
+  }, 0);
+  return starts;
+}
+
 function ensureLanes() {
   if (!state.lanes) {
     state.lanes = { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] };
@@ -196,6 +224,7 @@ function ensureLanes() {
   if (!Array.isArray(state.lanes.names) || !state.lanes.names.length) {
     state.lanes.names = ["Direccion", "Calidad", "Produccion"];
   }
+  normalizeLaneSizes();
 }
 
 function syncLaneControls() {
@@ -204,11 +233,6 @@ function syncLaneControls() {
   laneNamesInput.value = state.lanes.names.join("\n");
   lanesHorizontalBtn.classList.toggle("active", state.lanes.orientation === "horizontal");
   lanesVerticalBtn.classList.toggle("active", state.lanes.orientation === "vertical");
-}
-
-function laneSize() {
-  ensureLanes();
-  return state.lanes.orientation === "vertical" ? workspace.w / state.lanes.names.length : (workspace.h - headerReservedHeight()) / state.lanes.names.length;
 }
 
 function renderLanes(targetLayer = laneLayer, options = {}) {
@@ -221,17 +245,19 @@ function renderLanes(targetLayer = laneLayer, options = {}) {
   const clipH = options.h ?? workspace.h;
   const laneTop = headerReservedHeight();
   const laneHeight = workspace.h - laneTop;
-  const each = laneSize();
   const vertical = state.lanes.orientation === "vertical";
+  const starts = laneStarts();
+  const interactive = options.interactive ?? targetLayer === laneLayer;
   state.lanes.names.forEach((name, index) => {
+    const size = state.lanes.sizes[index];
     if (vertical) {
-      const x = index * each;
-      if (x > clipX + clipW || x + each < clipX || laneTop > clipY + clipH || laneTop + laneHeight < clipY) return;
+      const x = starts[index];
+      if (x > clipX + clipW || x + size < clipX || laneTop > clipY + clipH || laneTop + laneHeight < clipY) return;
       targetLayer.appendChild(createSvg("rect", {
         class: `lane-bg lane-bg-${index % 2}`,
         x,
         y: laneTop,
-        width: each,
+        width: size,
         height: laneHeight,
       }));
       targetLayer.appendChild(createSvg("line", {
@@ -243,20 +269,21 @@ function renderLanes(targetLayer = laneLayer, options = {}) {
       }));
       targetLayer.appendChild(createSvg("text", {
         class: "lane-label lane-label-vertical",
-        x: x + each / 2,
+        x: x + size / 2,
         y: laneTop + 42,
         "text-anchor": "middle",
       })).textContent = name || `Calle ${index + 1}`;
+      if (interactive && index > 0) addLaneResizeHandle(targetLayer, index, x, laneTop, x, laneTop + laneHeight, "vertical");
       return;
     }
-    const y = laneTop + index * each;
-    if (y > clipY + clipH || y + each < clipY) return;
+    const y = laneTop + starts[index];
+    if (y > clipY + clipH || y + size < clipY) return;
     targetLayer.appendChild(createSvg("rect", {
       class: `lane-bg lane-bg-${index % 2}`,
       x: clipX,
       y,
       width: clipW,
-      height: each,
+      height: size,
     }));
     targetLayer.appendChild(createSvg("line", {
       class: "lane-line",
@@ -270,7 +297,32 @@ function renderLanes(targetLayer = laneLayer, options = {}) {
       x: clipX + 24,
       y: y + 34,
     })).textContent = name || `Calle ${index + 1}`;
+    if (interactive && index > 0) addLaneResizeHandle(targetLayer, index, clipX, y, clipX + clipW, y, "horizontal");
   });
+}
+
+function addLaneResizeHandle(targetLayer, index, x1, y1, x2, y2, orientation) {
+  const handle = createSvg("line", {
+    class: `lane-resize-handle lane-resize-${orientation}`,
+    x1,
+    y1,
+    x2,
+    y2,
+    "data-lane-index": index,
+  });
+  handle.addEventListener("pointerdown", (event) => {
+    event.stopPropagation();
+    const point = getPoint(event);
+    laneResize = {
+      index,
+      orientation,
+      startPoint: point,
+      sizes: [...state.lanes.sizes],
+    };
+    svg.setPointerCapture(event.pointerId);
+    setStatus("Arrastra para ajustar la calle");
+  });
+  targetLayer.appendChild(handle);
 }
 function drawGrid() {
   gridLayer.innerHTML = "";
@@ -347,7 +399,7 @@ function fitToDiagram() {
   }
   const padding = 160;
   const bounds = state.nodes.reduce((box, node) => {
-    const size = shapeSize[node.shape] || shapeSize.process;
+    const size = getNodeSize(node);
     return {
       minX: Math.min(box.minX, node.x),
       minY: Math.min(box.minY, node.y),
@@ -369,12 +421,12 @@ function fitToDiagram() {
 }
 
 function centerOf(node) {
-  const size = shapeSize[node.shape] || shapeSize.process;
+  const size = getNodeSize(node);
   return { x: node.x + size.w / 2, y: node.y + size.h / 2 };
 }
 
 function connectionPoint(node, side) {
-  const size = shapeSize[node.shape] || shapeSize.process;
+  const size = getNodeSize(node);
   const center = centerOf(node);
   if (side === "left") return { x: node.x, y: center.y };
   if (side === "right") return { x: node.x + size.w, y: center.y };
@@ -403,7 +455,7 @@ function edgePath(from, to) {
 }
 
 function nodeBounds(node) {
-  const size = shapeSize[node.shape] || shapeSize.process;
+  const size = getNodeSize(node);
   return { x: node.x, y: node.y, w: size.w, h: size.h };
 }
 
@@ -437,12 +489,12 @@ function selectedNodes() {
 }
 
 function shapeElement(node) {
-  const size = shapeSize[node.shape] || shapeSize.process;
+  const size = getNodeSize(node);
   if (node.shape === "text") {
     return createSvg("rect", { class: "node-shape text-box-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 4, fill: "transparent" });
   }
   if (node.shape === "terminator") {
-    return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 47, fill: "#e8f7f3" });
+    return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: Math.min(size.h / 2, 54), fill: "#e8f7f3" });
   }
   if (node.shape === "decision") {
     const cx = node.x + size.w / 2;
@@ -466,7 +518,7 @@ function shapeElement(node) {
   return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 8, fill: "#ffffff" });
 }
 
-function wrapTextLines(text, maxChars, maxLines) {
+function wrapTextLines(text, maxChars, maxLines = Infinity) {
   const words = String(text || "").split(/\s+/).filter(Boolean);
   const lines = [];
   let current = "";
@@ -481,7 +533,7 @@ function wrapTextLines(text, maxChars, maxLines) {
   });
   if (current) lines.push(current);
   if (!lines.length) lines.push("Sin texto");
-  if (lines.length > maxLines) {
+  if (Number.isFinite(maxLines) && lines.length > maxLines) {
     const kept = lines.slice(0, maxLines);
     kept[maxLines - 1] = `${kept[maxLines - 1].replace(/\.\.\.$/, "")}...`;
     return kept;
@@ -489,8 +541,30 @@ function wrapTextLines(text, maxChars, maxLines) {
   return lines;
 }
 
+function nodeTextMaxChars(node) {
+  return node.shape === "text" ? 22 : 18;
+}
+
+function nodeMaxTextLines() {
+  return 20;
+}
+
+function getNodeSize(node) {
+  const base = shapeSize[node.shape] || shapeSize.process;
+  const lines = wrapTextLines(node.text, nodeTextMaxChars(node), nodeMaxTextLines());
+  const baseSize = node.shape === "text" ? 20 : 22;
+  const fontSize = Math.max(16, baseSize - Math.max(0, lines.length - 2) * 2);
+  const lineHeight = Math.round(fontSize * 1.18);
+  const ownerSpace = node.owner && node.shape !== "text" ? 34 : 0;
+  const padding = node.shape === "decision" ? 76 : node.shape === "text" ? 28 : 48;
+  return {
+    w: node.w || base.w,
+    h: Math.max(node.h || base.h, lines.length * lineHeight + ownerSpace + padding),
+  };
+}
+
 function addWrappedText(group, text, cx, cy, maxChars, className, options = {}) {
-  const maxLines = options.maxLines || 4;
+  const maxLines = options.maxLines ?? nodeMaxTextLines();
   const baseSize = options.fontSize || 22;
   const minSize = options.minFontSize || 16;
   const lineGap = options.lineGap || 1.18;
@@ -546,11 +620,11 @@ function render() {
   });
 
   state.nodes.forEach((node) => {
-    const size = shapeSize[node.shape] || shapeSize.process;
+    const size = getNodeSize(node);
     const group = createSvg("g", { class: `node${selectedNodeIds.has(node.id) ? " selected" : ""}`, "data-node-id": node.id });
     group.appendChild(shapeElement(node));
     const hasOwner = node.owner && node.shape !== "text";
-    addWrappedText(group, node.text, node.x + size.w / 2, node.y + size.h / 2 - (hasOwner ? 10 : 0), node.shape === "text" ? 22 : 18, "label", { maxLines: hasOwner ? 3 : 4, fontSize: node.shape === "text" ? 20 : 22 });
+    addWrappedText(group, node.text, node.x + size.w / 2, node.y + size.h / 2 - (hasOwner ? 12 : 0), nodeTextMaxChars(node), "label", { maxLines: nodeMaxTextLines(), fontSize: node.shape === "text" ? 20 : 22 });
     if (hasOwner) {
       group.appendChild(createSvg("text", {
         class: "owner",
@@ -657,7 +731,7 @@ function pasteSelection() {
   const idMap = new Map();
   const pastedNodes = internalClipboard.nodes.map((node) => {
     const id = uid("node");
-    const size = shapeSize[node.shape] || shapeSize.process;
+    const size = getNodeSize(node);
     idMap.set(node.id, id);
     return {
       ...node,
@@ -731,11 +805,11 @@ function svgForSelection() {
     copyEdges.appendChild(createSvg("path", { class: "edge", d: edgePath(from, to) }));
   });
   nodes.forEach((node) => {
-    const size = shapeSize[node.shape] || shapeSize.process;
+    const size = getNodeSize(node);
     const group = createSvg("g", { class: "node" });
     group.appendChild(shapeElement(node));
     const hasOwner = node.owner && node.shape !== "text";
-    addWrappedText(group, node.text, node.x + size.w / 2, node.y + size.h / 2 - (hasOwner ? 10 : 0), node.shape === "text" ? 22 : 18, "label", { maxLines: hasOwner ? 3 : 4, fontSize: node.shape === "text" ? 20 : 22 });
+    addWrappedText(group, node.text, node.x + size.w / 2, node.y + size.h / 2 - (hasOwner ? 12 : 0), nodeTextMaxChars(node), "label", { maxLines: nodeMaxTextLines(), fontSize: node.shape === "text" ? 20 : 22 });
     if (hasOwner) {
       group.appendChild(createSvg("text", { class: "owner", x: node.x + size.w / 2, y: node.y + size.h - 18, "text-anchor": "middle" })).textContent = node.owner;
     }
@@ -746,6 +820,105 @@ function svgForSelection() {
   return { text: new XMLSerializer().serializeToString(copySvg), width, height };
 }
 
+function exportSvgStyleText() {
+  return ".node-shape{stroke:#0f766e;stroke-width:3;filter:url(#shadow)}.text-box-shape{opacity:0;stroke:transparent;filter:none}.doc-header-box{fill:rgba(255,255,255,.94);stroke:#334155;stroke-width:2}.doc-header-line{stroke:#334155;stroke-width:2}.doc-header-company{fill:#111827;font:900 34px Arial,sans-serif}.doc-header-document{fill:#111827;font:500 28px Arial,sans-serif}.doc-header-logo{fill:#111827;font:900 25px Arial,sans-serif}.doc-header-info{fill:#111827;font:700 24px Arial,sans-serif}.doc-header-period{fill:#334155}.doc-header-period-text{fill:#fff;font:900 24px Arial,sans-serif;letter-spacing:.18em}.lane-bg{fill:rgba(15,118,110,.06)}.lane-bg-1{fill:rgba(15,118,110,.025)}.lane-line{stroke:rgba(15,118,110,.24);stroke-width:2}.lane-label{fill:rgba(16,32,29,.52);font:800 30px Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}.edge{fill:none;marker-end:url(#arrow);stroke:#334155;stroke-linecap:round;stroke-linejoin:round;stroke-width:4}.label{fill:#10201d;font-weight:800}.owner{fill:#64748b;font:700 18px Arial,sans-serif}.watermark{fill:rgba(16,32,29,.18);font:800 28px Arial,sans-serif;letter-spacing:.02em}";
+}
+
+function laneRangeForBounds(bounds, axis) {
+  ensureLanes();
+  const starts = laneStarts();
+  const sizes = state.lanes.sizes;
+  const minValue = axis === "x" ? bounds.minX : bounds.minY;
+  const maxValue = axis === "x" ? bounds.maxX : bounds.maxY;
+  let first = 0;
+  let last = sizes.length - 1;
+  starts.forEach((start, index) => {
+    const end = start + sizes[index];
+    if (minValue >= start && minValue <= end) first = index;
+    if (maxValue >= start && maxValue <= end) last = index;
+  });
+  return { start: starts[first], end: starts[last] + sizes[last] };
+}
+
+function fullDiagramBounds() {
+  if (!state.nodes.length) return { x: view.x, y: view.y, w: view.w, h: view.h };
+  ensureLanes();
+  const bounds = selectionBounds(state.nodes);
+  const padding = 140;
+  const includeHeader = Boolean(state.header?.enabled);
+  const verticalLanes = Boolean(state.lanes?.enabled && state.lanes.orientation === "vertical");
+  const horizontalLanes = Boolean(state.lanes?.enabled && state.lanes.orientation === "horizontal");
+
+  let minX = Math.max(0, bounds.minX - padding);
+  let minY = Math.max(0, bounds.minY - padding);
+  let maxX = Math.min(workspace.w, bounds.maxX + padding);
+  let maxY = Math.min(workspace.h, bounds.maxY + padding);
+
+  if (includeHeader) {
+    minX = 0;
+    minY = 0;
+    maxX = Math.max(maxX, headerLayout.x + headerLayout.w + 20);
+    maxY = Math.max(maxY, headerReservedHeight());
+  }
+
+  if (verticalLanes) {
+    const laneRange = laneRangeForBounds(bounds, "x");
+    minX = includeHeader ? 0 : Math.max(0, laneRange.start - 40);
+    maxX = Math.min(workspace.w, Math.max(maxX, laneRange.end + 40));
+  }
+
+  if (horizontalLanes) {
+    const laneRange = laneRangeForBounds(bounds, "y");
+    minY = includeHeader ? 0 : Math.max(0, headerReservedHeight() + laneRange.start - 40);
+    maxY = Math.min(workspace.h, Math.max(maxY, headerReservedHeight() + laneRange.end + 40));
+  }
+
+  return { x: minX, y: minY, w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
+}
+
+function svgForFullDiagram() {
+  const box = fullDiagramBounds();
+  const clone = svg.cloneNode(true);
+  clone.querySelectorAll(".selected").forEach((el) => el.classList.remove("selected"));
+  clone.querySelectorAll(".lane-resize-handle").forEach((el) => el.remove());
+  clone.setAttribute("xmlns", NS);
+  clone.setAttribute("viewBox", `${box.x} ${box.y} ${box.w} ${box.h}`);
+  clone.setAttribute("width", box.w);
+  clone.setAttribute("height", box.h);
+  clone.insertBefore(createSvg("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: "#eef6f4" }), clone.firstChild);
+  clone.insertBefore(createSvg("style"), clone.firstChild).textContent = exportSvgStyleText();
+  return {
+    text: new XMLSerializer().serializeToString(clone),
+    width: box.w,
+    height: box.h,
+  };
+}
+function svgToJpegDataUrl(svgText, width, height) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    image.onload = () => {
+      const maxSide = 5200;
+      const maxPixels = 14000000;
+      const scale = Math.min(1.6, maxSide / width, maxSide / height, Math.sqrt(maxPixels / (width * height)));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#eef6f4";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.96));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo renderizar SVG"));
+    };
+    image.src = url;
+  });
+}
 function svgToPngBlob(svgText, width, height) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -1114,14 +1287,22 @@ document.getElementById("deleteBtn").addEventListener("click", () => {
   render();
 });
 
-document.getElementById("clearBtn").addEventListener("click", () => {
+function newDiagram() {
+  currentRecordId = "";
+  localStorage.removeItem(currentRecordKey);
   state = { title: "Nuevo diagrama", nodes: [], edges: [], header: defaultHeader(), lanes: { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] } };
   clearSelection();
   titleInput.value = state.title;
   save();
+  syncHeaderControls();
+  syncLaneControls();
   syncProperties();
   render();
-});
+  setStatus("Nuevo diagrama listo");
+}
+
+document.getElementById("clearBtn").addEventListener("click", newDiagram);
+document.getElementById("newDiagramBtn").addEventListener("click", newDiagram);
 
 document.getElementById("auditTemplateBtn").addEventListener("click", templateAudit);
 document.getElementById("ncTemplateBtn").addEventListener("click", templateNc);
@@ -1175,6 +1356,8 @@ laneNamesInput.addEventListener("input", () => {
   ensureLanes();
   state.lanes.names = laneNamesInput.value.split(/\r?\n/).map((name) => name.trim()).filter(Boolean);
   if (!state.lanes.names.length) state.lanes.names = ["Calle 1"];
+  state.lanes.sizes = [];
+  ensureLanes();
   save();
   render();
 });
@@ -1182,6 +1365,7 @@ lanesHorizontalBtn.addEventListener("click", () => {
   ensureLanes();
   state.lanes.orientation = "horizontal";
   state.lanes.enabled = true;
+  normalizeLaneSizes();
   syncLaneControls();
   save();
   render();
@@ -1190,6 +1374,7 @@ lanesVerticalBtn.addEventListener("click", () => {
   ensureLanes();
   state.lanes.orientation = "vertical";
   state.lanes.enabled = true;
+  normalizeLaneSizes();
   syncLaneControls();
   save();
   render();
@@ -1197,14 +1382,20 @@ lanesVerticalBtn.addEventListener("click", () => {
 document.getElementById("addLaneBtn").addEventListener("click", () => {
   ensureLanes();
   state.lanes.names.push(`Calle ${state.lanes.names.length + 1}`);
+  state.lanes.sizes = [];
   state.lanes.enabled = true;
+  ensureLanes();
   syncLaneControls();
   save();
   render();
 });
 document.getElementById("removeLaneBtn").addEventListener("click", () => {
   ensureLanes();
-  if (state.lanes.names.length > 1) state.lanes.names.pop();
+  if (state.lanes.names.length > 1) {
+    state.lanes.names.pop();
+    state.lanes.sizes = [];
+  }
+  ensureLanes();
   syncLaneControls();
   save();
   render();
@@ -1238,6 +1429,19 @@ nodeShape.addEventListener("change", () => {
 
 
 svg.addEventListener("pointermove", (event) => {
+  if (laneResize) {
+    const point = getPoint(event);
+    const delta = laneResize.orientation === "vertical" ? point.x - laneResize.startPoint.x : point.y - laneResize.startPoint.y;
+    const prevIndex = laneResize.index - 1;
+    const nextIndex = laneResize.index;
+    const minSize = 140;
+    const pairTotal = laneResize.sizes[prevIndex] + laneResize.sizes[nextIndex];
+    const prevSize = clamp(laneResize.sizes[prevIndex] + delta, minSize, pairTotal - minSize);
+    state.lanes.sizes[prevIndex] = prevSize;
+    state.lanes.sizes[nextIndex] = pairTotal - prevSize;
+    render();
+    return;
+  }
   if (selectBox) {
     selectBox.end = getPoint(event);
     render();
@@ -1266,7 +1470,7 @@ svg.addEventListener("pointermove", (event) => {
   drag.nodes.forEach((start) => {
     const node = state.nodes.find((item) => item.id === start.id);
     if (!node) return;
-    const size = shapeSize[node.shape] || shapeSize.process;
+    const size = getNodeSize(node);
     node.x = clamp(start.x + deltaX, 20, workspace.w - size.w - 20);
     node.y = clamp(start.y + deltaY, 20, workspace.h - size.h - 20);
   });
@@ -1274,6 +1478,13 @@ svg.addEventListener("pointermove", (event) => {
 });
 
 function endPointerAction() {
+  if (laneResize) {
+    normalizeLaneSizes();
+    save();
+    laneResize = null;
+    setStatus("Tamano de calle actualizado");
+    return;
+  }
   if (selectBox) {
     const box = normalizeBox(selectBox.start, selectBox.end);
     const ids = state.nodes.filter((node) => rectsIntersect(nodeBounds(node), box)).map((node) => node.id);
@@ -1294,43 +1505,21 @@ function endPointerAction() {
 }
 
 async function exportToPDF() {
-  const svgData = svgForSelection();
-
-  if (!svgData) {
-    setStatus("No hay contenido para exportar");
-    return;
-  }
+  const svgData = svgForFullDiagram();
 
   try {
-    // convertir SVG a PNG
-    const pngBlob = await svgToPngBlob(svgData.text, svgData.width, svgData.height);
+    const jpegDataUrl = await svgToJpegDataUrl(svgData.text, svgData.width, svgData.height);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      unit: "px",
+      format: [svgData.width, svgData.height],
+      hotfixes: ["px_scaling"],
+      compress: true,
+    });
 
-    const imgUrl = URL.createObjectURL(pngBlob);
-
-    const img = new Image();
-    img.onload = async () => {
-      const { jsPDF } = window.jspdf;
-
-      // crear PDF (horizontal si es ancho)
-      const orientation = svgData.width > svgData.height ? "landscape" : "portrait";
-
-      const pdf = new jsPDF({
-        orientation,
-        unit: "px",
-        format: [svgData.width, svgData.height]
-      });
-
-      pdf.addImage(img, "PNG", 0, 0, svgData.width, svgData.height);
-
-      pdf.save(`${safeName(state.title)}.pdf`);
-
-      URL.revokeObjectURL(imgUrl);
-
-      setStatus("PDF exportado");
-    };
-
-    img.src = imgUrl;
-
+    pdf.addImage(jpegDataUrl, "JPEG", 0, 0, svgData.width, svgData.height);
+    pdf.save(`${safeName(state.title)}.pdf`);
+    setStatus("PDF exportado completo");
   } catch (error) {
     console.error(error);
     setStatus("Error al generar PDF");
@@ -1340,8 +1529,12 @@ async function exportToPDF() {
 svg.addEventListener("pointerup", endPointerAction);
 svg.addEventListener("pointercancel", endPointerAction);
 
+function isCanvasBackgroundTarget(target) {
+  return target === svg || target === gridLayer || target.parentNode === gridLayer || target === laneLayer || target.parentNode === laneLayer;
+}
+
 svg.addEventListener("pointerdown", (event) => {
-  if (event.target === svg || event.target === gridLayer || event.target.parentNode === gridLayer) {
+  if (isCanvasBackgroundTarget(event.target)) {
     if (selectMode) {
       const point = getPoint(event);
       selectBox = { start: point, end: point };
@@ -1387,46 +1580,42 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault();
-  deferredInstall = event;
-  document.getElementById("installBtn").hidden = false;
-});
 
-document.getElementById("installBtn").addEventListener("click", async () => {
-  if (!deferredInstall) return;
-  deferredInstall.prompt();
-  await deferredInstall.userChoice;
-  deferredInstall = null;
-  document.getElementById("installBtn").hidden = true;
-});
 
-document.getElementById("closeModalBtn").addEventListener("click", () => {
-  document.getElementById("openModal").classList.add("hidden");
-});
+const closeModalBtn = document.getElementById("closeModalBtn");
+const loadRecordBtn = document.getElementById("loadRecordBtn");
+const openModalEl = document.getElementById("openModal");
 
-document.getElementById("loadRecordBtn").addEventListener("click", () => {
-  const select = document.getElementById("recordsSelect");
-  const selectedId = select.value;
+if (closeModalBtn && openModalEl) {
+  closeModalBtn.addEventListener("click", () => {
+    openModalEl.classList.add("hidden");
+  });
+}
 
-  if (!selectedId) return;
+if (loadRecordBtn) {
+  loadRecordBtn.addEventListener("click", () => {
+    const select = document.getElementById("recordsSelect");
+    const selectedId = select?.value;
 
-  const record = window._recordsCache.find(r => r.id === selectedId);
+    if (!selectedId) return;
 
-  if (!record || !record.diagram) {
-    setStatus("Registro inválido");
-    return;
-  }
+    const record = (window._recordsCache || []).find((item) => item.id === selectedId);
 
-  currentRecordId = record.id;
-  localStorage.setItem(currentRecordKey, currentRecordId);
+    if (!record || !record.diagram) {
+      setStatus("Registro invalido");
+      return;
+    }
 
-  applyDiagramData(record.diagram);
+    currentRecordId = record.id;
+    localStorage.setItem(currentRecordKey, currentRecordId);
 
-  document.getElementById("openModal").classList.add("hidden");
+    applyDiagramData(record.diagram);
 
-  setStatus("Registro cargado");
-});
+    openModalEl?.classList.add("hidden");
+
+    setStatus("Registro cargado");
+  });
+}
 
 document.getElementById("exportPdfBtn").addEventListener("click", exportToPDF);
 

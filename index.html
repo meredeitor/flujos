@@ -7,19 +7,19 @@
     <title>Flujos SGI</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=0.1.5" />
   </head>
   <body>
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">SGI</span>
         <div>
-          <h1>Flujos SGI <span id="appVersion" class="version-badge">v0.1.0</span></h1>
+          <h1>Flujos SGI <span id="appVersion" class="version-badge"></span></h1>
           <p>Diagramas de flujo para tu proceso</p>
         </div>
       </div>
       <div class="actions">
-        <button id="installBtn" class="ghost" hidden>Instalar</button>
+        <button id="newDiagramBtn" class="ghost">Nuevo</button>
         <button id="openRecordBtn" class="ghost">Abrir</button>
         <button id="saveAsBtn">Guardar como</button>
         <button id="saveBtn">Guardar cambios</button>
@@ -183,7 +183,7 @@
   </div>
 </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="app.js"></script>
-    <script type="module" src="firebase-init.js"></script>
+    <script src="app.js?v=0.1.5"></script>
+    <script type="module" src="firebase-init.js?v=0.1.5"></script>
   </body>
 </html>
