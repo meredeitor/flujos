@@ -1,8 +1,8 @@
-{
+﻿{
   "name": "Flujos SGI",
   "short_name": "Flujos SGI",
   "description": "PWA gratuita para crear diagramas de flujo del sistema de gestion de calidad.",
-  "version": "0.1.6",
+  "version": "0.2.6",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f7faf9",
@@ -16,3 +16,12 @@
     }
   ]
 }
+
+
+
+
+
+
+
+
+

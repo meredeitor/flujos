@@ -1,4 +1,4 @@
-const svg = document.getElementById("flowCanvas");
+﻿const svg = document.getElementById("flowCanvas");
 const gridLayer = document.getElementById("gridLayer");
 const headerLayer = document.getElementById("headerLayer");
 const laneLayer = document.getElementById("laneLayer");
@@ -26,23 +26,36 @@ const headerPeriodInput = document.getElementById("headerPeriod");
 const headerLeftLogoInput = document.getElementById("headerLeftLogoInput");
 const headerRightLogoInput = document.getElementById("headerRightLogoInput");
 const appVersionBadge = document.getElementById("appVersion");
+const currentUserLabel = document.getElementById("currentUserLabel");
+const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.1.6";
+const appVersion = "0.2.6";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
+const sessionUserKey = "flujos-sgc-session-user-v1";
 const cloudCollection = "diagramas";
-const workspace = { w: 4800, h: 3200 };
+const workspace = { w: 16000, h: 10400 };
 const defaultView = { x: 0, y: 0, w: 1600, h: 1000 };
 const headerLayout = { x: 20, y: 20, w: 1560, topH: 125, gap: 22, bottomH: 96, reserve: 300 };
-const minZoom = 0.35;
+const minZoom = 0.09;
 const maxZoom = 2.5;
 const shapeSize = {
   terminator: { w: 220, h: 94 },
   process: { w: 240, h: 110 },
+  subprocess: { w: 260, h: 110 },
+  data: { w: 250, h: 110 },
   decision: { w: 220, h: 150 },
   document: { w: 240, h: 122 },
   text: { w: 190, h: 64 },
+};
+
+const diagramThemes = {
+  sgi: { name: "SGI verde", stroke: "#0f766e", fills: { terminator: "#e8f7f3", process: "#ffffff", subprocess: "#ffffff", data: "#f0fdf4", decision: "#fff7ed", document: "#eff6ff" } },
+  blue: { name: "Azul", stroke: "#2563eb", fills: { terminator: "#dbeafe", process: "#ffffff", subprocess: "#ffffff", data: "#e0f2fe", decision: "#fef3c7", document: "#eef2ff" } },
+  amber: { name: "Ambar", stroke: "#d97706", fills: { terminator: "#fef3c7", process: "#ffffff", subprocess: "#ffffff", data: "#fffbeb", decision: "#fed7aa", document: "#fff7ed" } },
+  slate: { name: "Grafito", stroke: "#475569", fills: { terminator: "#f1f5f9", process: "#ffffff", subprocess: "#ffffff", data: "#e2e8f0", decision: "#f8fafc", document: "#f1f5f9" } },
+  rose: { name: "Vino", stroke: "#be123c", fills: { terminator: "#ffe4e6", process: "#ffffff", subprocess: "#ffffff", data: "#fff1f2", decision: "#ffedd5", document: "#fdf2f8" } },
 };
 
 let state = {
@@ -51,6 +64,7 @@ let state = {
   edges: [],
   header: defaultHeader(),
   lanes: { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] },
+  theme: "sgi",
 };
 
 let selectedNodeId = null;
@@ -67,6 +81,9 @@ let deferredInstall = null;
 let view = { ...defaultView };
 let internalClipboard = null;
 let currentRecordId = localStorage.getItem(currentRecordKey) || "";
+let sessionUser = localStorage.getItem(sessionUserKey) || "";
+if (sessionUser === "Hermenegildo Perez") sessionUser = "Hermenegildo Pérez";
+if (sessionUser === "Omar Martinez") sessionUser = "Omar Martínez";
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -78,6 +95,42 @@ function setStatus(message) {
   setStatus.timer = window.setTimeout(() => {
     statusText.textContent = "Listo";
   }, 2200);
+}
+
+function updateSessionUI() {
+  if (!currentUserLabel || !userSelect) return;
+  currentUserLabel.textContent = sessionUser ? `Sesion: ${sessionUser}` : "Sin sesion";
+  currentUserLabel.classList.toggle("active", Boolean(sessionUser));
+  userSelect.value = sessionUser;
+}
+
+function setSessionUser(value) {
+  sessionUser = value || "";
+  if (sessionUser) {
+    localStorage.setItem(sessionUserKey, sessionUser);
+    setStatus(`Sesion iniciada: ${sessionUser}`);
+  } else {
+    localStorage.removeItem(sessionUserKey);
+    setStatus("Selecciona usuario para guardar cambios");
+  }
+  updateSessionUI();
+}
+
+function requireSession() {
+  if (sessionUser) return true;
+  setStatus("Selecciona usuario para guardar cambios");
+  userSelect?.focus();
+  return false;
+}
+
+function revisionEntry(version, action) {
+  return {
+    version,
+    action,
+    by: sessionUser || "Sin sesion",
+    at: new Date().toISOString(),
+    appVersion,
+  };
 }
 
 function createSvg(name, attrs = {}) {
@@ -106,6 +159,32 @@ function defaultHeader() {
 function ensureHeader() {
   if (!state.header) state.header = defaultHeader();
   state.header = { ...defaultHeader(), ...state.header };
+}
+
+function ensureTheme() {
+  if (!state.theme || !diagramThemes[state.theme]) state.theme = "sgi";
+}
+
+function activeTheme() {
+  ensureTheme();
+  return diagramThemes[state.theme];
+}
+
+function themeFill(shape) {
+  const theme = activeTheme();
+  return theme.fills[shape] || theme.fills.process || "#ffffff";
+}
+
+function themeStroke(node) {
+  return selectedNodeIds.has(node.id) ? "#f59e0b" : activeTheme().stroke;
+}
+
+function setDiagramTheme(themeId) {
+  if (!diagramThemes[themeId]) return;
+  state.theme = themeId;
+  save();
+  render();
+  setStatus(`Tema aplicado: ${diagramThemes[themeId].name}`);
 }
 
 function syncHeaderControls() {
@@ -488,13 +567,37 @@ function selectedNodes() {
   return state.nodes.filter((node) => selectedNodeIds.has(node.id));
 }
 
+function shapeStyle(node) {
+  return `--node-stroke:${activeTheme().stroke}`;
+}
+
+function detailStyle(node) {
+  return `--node-stroke:${activeTheme().stroke}`;
+}
+
 function shapeElement(node) {
   const size = getNodeSize(node);
   if (node.shape === "text") {
     return createSvg("rect", { class: "node-shape text-box-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 4, fill: "transparent" });
   }
   if (node.shape === "terminator") {
-    return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: Math.min(size.h / 2, 54), fill: "#e8f7f3" });
+    return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: Math.min(size.h / 2, 54), fill: themeFill(node.shape), style: shapeStyle(node) });
+  }
+  if (node.shape === "subprocess") {
+    const group = createSvg("g");
+    group.appendChild(createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 8, fill: themeFill(node.shape), style: shapeStyle(node) }));
+    group.appendChild(createSvg("line", { class: "node-shape-detail", x1: node.x + 24, y1: node.y + 8, x2: node.x + 24, y2: node.y + size.h - 8, style: detailStyle(node) }));
+    group.appendChild(createSvg("line", { class: "node-shape-detail", x1: node.x + size.w - 24, y1: node.y + 8, x2: node.x + size.w - 24, y2: node.y + size.h - 8, style: detailStyle(node) }));
+    return group;
+  }
+  if (node.shape === "data") {
+    const slant = Math.min(34, size.w * 0.16);
+    return createSvg("polygon", {
+      class: "node-shape",
+      points: `${node.x + slant},${node.y} ${node.x + size.w},${node.y} ${node.x + size.w - slant},${node.y + size.h} ${node.x},${node.y + size.h}`,
+      fill: themeFill(node.shape),
+      style: shapeStyle(node),
+    });
   }
   if (node.shape === "decision") {
     const cx = node.x + size.w / 2;
@@ -502,7 +605,8 @@ function shapeElement(node) {
     return createSvg("polygon", {
       class: "node-shape",
       points: `${cx},${node.y} ${node.x + size.w},${cy} ${cx},${node.y + size.h} ${node.x},${cy}`,
-      fill: "#fff7ed",
+      fill: themeFill(node.shape),
+      style: shapeStyle(node),
     });
   }
   if (node.shape === "document") {
@@ -513,9 +617,9 @@ function shapeElement(node) {
       `C ${node.x + size.w - 60} ${node.y + size.h + 8}, ${node.x + 60} ${node.y + size.h - 56}, ${node.x} ${node.y + size.h - 18}`,
       "Z",
     ].join(" ");
-    return createSvg("path", { class: "node-shape", d, fill: "#eff6ff" });
+    return createSvg("path", { class: "node-shape", d, fill: themeFill(node.shape), style: shapeStyle(node) });
   }
-  return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 8, fill: "#ffffff" });
+  return createSvg("rect", { class: "node-shape", x: node.x, y: node.y, width: size.w, height: size.h, rx: 8, fill: themeFill(node.shape), style: shapeStyle(node) });
 }
 
 function wrapTextLines(text, maxChars, maxLines = Infinity) {
@@ -785,7 +889,7 @@ function svgForSelection() {
   const width = Math.ceil(maxX - minX);
   const height = Math.ceil(maxY - minY);
   const copySvg = createSvg("svg", { xmlns: NS, viewBox: `${minX} ${minY} ${width} ${height}`, width, height });
-  copySvg.appendChild(createSvg("style")).textContent = ".node-shape{stroke:#0f766e;stroke-width:3}.text-box-shape{opacity:0;stroke:transparent;filter:none}.doc-header-box{fill:rgba(255,255,255,.94);stroke:#334155;stroke-width:2}.doc-header-line{stroke:#334155;stroke-width:2}.doc-header-company{fill:#111827;font:900 34px Arial,sans-serif}.doc-header-document{fill:#111827;font:500 28px Arial,sans-serif}.doc-header-logo{fill:#111827;font:900 25px Arial,sans-serif}.doc-header-info{fill:#111827;font:700 24px Arial,sans-serif}.doc-header-period{fill:#334155}.doc-header-period-text{fill:#fff;font:900 24px Arial,sans-serif;letter-spacing:.18em}.lane-bg{fill:rgba(15,118,110,.06)}.lane-bg-1{fill:rgba(15,118,110,.025)}.lane-line{stroke:rgba(15,118,110,.24);stroke-width:2}.lane-label{fill:rgba(16,32,29,.52);font:800 30px Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}.edge{fill:none;marker-end:url(#arrow);stroke:#334155;stroke-width:4}.label{fill:#10201d;font:800 24px Arial,sans-serif}.owner{fill:#64748b;font:700 20px Arial,sans-serif}";
+  copySvg.appendChild(createSvg("style")).textContent = ".node-shape{stroke:var(--node-stroke,#0f766e);stroke-width:3}.node-shape-detail{stroke:var(--node-stroke,#0f766e);stroke-width:3}.text-box-shape{opacity:0;stroke:transparent;filter:none}.doc-header-box{fill:rgba(255,255,255,.94);stroke:#334155;stroke-width:2}.doc-header-line{stroke:#334155;stroke-width:2}.doc-header-company{fill:#111827;font:900 34px Arial,sans-serif}.doc-header-document{fill:#111827;font:500 28px Arial,sans-serif}.doc-header-logo{fill:#111827;font:900 25px Arial,sans-serif}.doc-header-info{fill:#111827;font:700 24px Arial,sans-serif}.doc-header-period{fill:#334155}.doc-header-period-text{fill:#fff;font:900 24px Arial,sans-serif;letter-spacing:.18em}.lane-bg{fill:rgba(15,118,110,.06)}.lane-bg-1{fill:rgba(15,118,110,.025)}.lane-line{stroke:rgba(15,118,110,.24);stroke-width:2}.lane-label{fill:rgba(16,32,29,.52);font:800 30px Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}.edge{fill:none;marker-end:url(#arrow);stroke:#334155;stroke-width:4}.label{fill:#10201d;font:800 24px Arial,sans-serif}.owner{fill:#64748b;font:700 20px Arial,sans-serif}";
   copySvg.appendChild(svg.querySelector("defs").cloneNode(true));
   copySvg.appendChild(createSvg("rect", { x: minX, y: minY, width, height, fill: "#ffffff" }));
   if (includeHeader) {
@@ -821,7 +925,7 @@ function svgForSelection() {
 }
 
 function exportSvgStyleText() {
-  return ".node-shape{stroke:#0f766e;stroke-width:3;filter:url(#shadow)}.text-box-shape{opacity:0;stroke:transparent;filter:none}.doc-header-box{fill:rgba(255,255,255,.94);stroke:#334155;stroke-width:2}.doc-header-line{stroke:#334155;stroke-width:2}.doc-header-company{fill:#111827;font:900 34px Arial,sans-serif}.doc-header-document{fill:#111827;font:500 28px Arial,sans-serif}.doc-header-logo{fill:#111827;font:900 25px Arial,sans-serif}.doc-header-info{fill:#111827;font:700 24px Arial,sans-serif}.doc-header-period{fill:#334155}.doc-header-period-text{fill:#fff;font:900 24px Arial,sans-serif;letter-spacing:.18em}.lane-bg{fill:rgba(15,118,110,.06)}.lane-bg-1{fill:rgba(15,118,110,.025)}.lane-line{stroke:rgba(15,118,110,.24);stroke-width:2}.lane-label{fill:rgba(16,32,29,.52);font:800 30px Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}.edge{fill:none;marker-end:url(#arrow);stroke:#334155;stroke-linecap:round;stroke-linejoin:round;stroke-width:4}.label{fill:#10201d;font-weight:800}.owner{fill:#64748b;font:700 18px Arial,sans-serif}.watermark{fill:rgba(16,32,29,.18);font:800 28px Arial,sans-serif;letter-spacing:.02em}";
+  return ".node-shape{stroke:var(--node-stroke,#0f766e);stroke-width:3;filter:url(#shadow)}.node-shape-detail{stroke:var(--node-stroke,#0f766e);stroke-width:3}.text-box-shape{opacity:0;stroke:transparent;filter:none}.doc-header-box{fill:rgba(255,255,255,.94);stroke:#334155;stroke-width:2}.doc-header-line{stroke:#334155;stroke-width:2}.doc-header-company{fill:#111827;font:900 34px Arial,sans-serif}.doc-header-document{fill:#111827;font:500 28px Arial,sans-serif}.doc-header-logo{fill:#111827;font:900 25px Arial,sans-serif}.doc-header-info{fill:#111827;font:700 24px Arial,sans-serif}.doc-header-period{fill:#334155}.doc-header-period-text{fill:#fff;font:900 24px Arial,sans-serif;letter-spacing:.18em}.lane-bg{fill:rgba(15,118,110,.06)}.lane-bg-1{fill:rgba(15,118,110,.025)}.lane-line{stroke:rgba(15,118,110,.24);stroke-width:2}.lane-label{fill:rgba(16,32,29,.52);font:800 30px Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}.edge{fill:none;marker-end:url(#arrow);stroke:#334155;stroke-linecap:round;stroke-linejoin:round;stroke-width:4}.label{fill:#10201d;font-weight:800}.owner{fill:#64748b;font:700 18px Arial,sans-serif}.watermark{fill:rgba(16,32,29,.18);font:800 28px Arial,sans-serif;letter-spacing:.02em}";
 }
 
 function laneRangeForBounds(bounds, axis) {
@@ -1040,6 +1144,7 @@ function applyDiagramData(data) {
   state = data;
   ensureHeader();
   ensureLanes();
+  ensureTheme();
   clearSelection();
   titleInput.value = state.title || "Diagrama sin titulo";
   save();
@@ -1073,36 +1178,52 @@ function recordPayload(name) {
 }
 
 async function saveRecordAs() {
+  if (!requireSession()) return;
   try {
     const tools = await firebaseTools();
     const name = window.prompt("Nombre del registro", titleInput.value || state.title || "Nuevo diagrama");
     if (!name) return;
+    const version = 1;
     const payload = recordPayload(name.trim());
     const ref = await tools.addDoc(tools.collection(tools.db, cloudCollection), {
       ...payload,
+      recordVersion: version,
+      createdBy: sessionUser,
+      updatedBy: sessionUser,
+      revisionHistory: [revisionEntry(version, "crear")],
       createdAt: tools.serverTimestamp(),
       updatedAt: tools.serverTimestamp(),
     });
     currentRecordId = ref.id;
     localStorage.setItem(currentRecordKey, currentRecordId);
-    setStatus("Registro guardado en Firebase");
+    setStatus(`Registro guardado por ${sessionUser} (v${version})`);
   } catch {
     setStatus("No se pudo guardar en Firebase");
   }
 }
 
 async function saveRecordChanges() {
+  if (!requireSession()) return;
   if (!currentRecordId) {
     await saveRecordAs();
     return;
   }
   try {
     const tools = await firebaseTools();
-    await tools.setDoc(tools.doc(tools.db, cloudCollection, currentRecordId), {
+    const ref = tools.doc(tools.db, cloudCollection, currentRecordId);
+    const currentSnap = await tools.getDoc(ref);
+    const currentData = currentSnap.exists() ? currentSnap.data() : {};
+    const previousHistory = Array.isArray(currentData.revisionHistory) ? currentData.revisionHistory : [];
+    const version = Number(currentData.recordVersion || 0) + 1;
+    await tools.setDoc(ref, {
       ...recordPayload(titleInput.value || state.title),
+      recordVersion: version,
+      createdBy: currentData.createdBy || sessionUser,
+      updatedBy: sessionUser,
+      revisionHistory: [...previousHistory, revisionEntry(version, "actualizar")],
       updatedAt: tools.serverTimestamp(),
     }, { merge: true });
-    setStatus("Cambios guardados en Firebase");
+    setStatus(`Cambios guardados por ${sessionUser} (v${version})`);
   } catch {
     setStatus("No se pudieron guardar los cambios");
   }
@@ -1135,7 +1256,7 @@ async function openCloudRecord() {
     records.forEach(record => {
       const option = document.createElement("option");
       option.value = record.id;
-      option.textContent = record.name || record.title || "Sin título";
+      option.textContent = `${record.name || record.title || "Sin titulo"} | v${record.recordVersion || 1} | ${record.updatedBy || record.createdBy || "Sin usuario"}`;
       select.appendChild(option);
     });
 
@@ -1156,6 +1277,9 @@ function load() {
   if (raw) {
     try {
       state = JSON.parse(raw);
+      ensureHeader();
+      ensureLanes();
+      ensureTheme();
       return;
     } catch {
       localStorage.removeItem(storeKey);
@@ -1168,7 +1292,8 @@ function loadDefault() {
   state = {
     title: "Proceso del SGI",
     header: defaultHeader(),
-  lanes: { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] },
+    lanes: { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] },
+    theme: "sgi",
     nodes: [
       { id: "node-start", shape: "terminator", x: 130, y: 170, text: "Inicio", owner: "Solicitante" },
       { id: "node-review", shape: "process", x: 440, y: 160, text: "Revisar solicitud o entrada", owner: "Responsable" },
@@ -1228,6 +1353,7 @@ function templateAudit() {
       { id: uid("node"), shape: "document", x: 1060, y: 430, text: "Emitir informe y acciones", owner: "Calidad" },
     ],
     edges: [],
+    theme: state.theme || "sgi",
   };
   state.edges = state.nodes.slice(0, -1).map((node, index) => ({ id: uid("edge"), from: node.id, to: state.nodes[index + 1].id }));
   clearSelection();
@@ -1248,6 +1374,7 @@ function templateNc() {
       { id: uid("node"), shape: "terminator", x: 720, y: 430, text: "Cerrar NC", owner: "SGI" },
     ],
     edges: [],
+    theme: state.theme || "sgi",
   };
   state.edges = [
     { id: uid("edge"), from: state.nodes[0].id, to: state.nodes[1].id },
@@ -1266,6 +1393,16 @@ document.querySelectorAll(".shape-tool").forEach((button) => {
   button.addEventListener("click", () => addNode(button.dataset.shape));
 });
 
+document.querySelectorAll("[data-command]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.getElementById(button.dataset.command)?.click();
+  });
+});
+
+document.querySelectorAll("[data-theme]").forEach((button) => {
+  button.addEventListener("click", () => setDiagramTheme(button.dataset.theme));
+});
+
 document.getElementById("connectBtn").addEventListener("click", (event) => {
   connectMode = !connectMode;
   connectFrom = null;
@@ -1273,7 +1410,7 @@ document.getElementById("connectBtn").addEventListener("click", (event) => {
   setStatus(connectMode ? "Selecciona la figura origen" : "Conexion cancelada");
 });
 
-document.getElementById("deleteBtn").addEventListener("click", () => {
+function deleteSelection() {
   if (selectedNodeIds.size) {
     state.nodes = state.nodes.filter((node) => !selectedNodeIds.has(node.id));
     state.edges = state.edges.filter((edge) => !selectedNodeIds.has(edge.from) && !selectedNodeIds.has(edge.to));
@@ -1281,16 +1418,21 @@ document.getElementById("deleteBtn").addEventListener("click", () => {
   } else if (selectedEdgeId) {
     state.edges = state.edges.filter((edge) => edge.id !== selectedEdgeId);
     selectedEdgeId = null;
+  } else {
+    setStatus("Selecciona algo para eliminar");
+    return;
   }
   save();
   syncProperties();
   render();
-});
+}
+
+document.getElementById("deleteBtn").addEventListener("click", deleteSelection);
 
 function newDiagram() {
   currentRecordId = "";
   localStorage.removeItem(currentRecordKey);
-  state = { title: "Nuevo diagrama", nodes: [], edges: [], header: defaultHeader(), lanes: { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] } };
+  state = { title: "Nuevo diagrama", nodes: [], edges: [], header: defaultHeader(), lanes: { enabled: false, orientation: "horizontal", names: ["Direccion", "Calidad", "Produccion"] }, theme: "sgi" };
   clearSelection();
   titleInput.value = state.title;
   save();
@@ -1561,23 +1703,50 @@ document.getElementById("zoomInBtn").addEventListener("click", () => zoomAt(1.18
 document.getElementById("zoomResetBtn").addEventListener("click", resetZoom);
 document.getElementById("zoomFitBtn").addEventListener("click", fitToDiagram);
 document.getElementById("fullscreenBtn").addEventListener("click", toggleFullscreen);
+userSelect?.addEventListener("change", () => setSessionUser(userSelect.value));
 document.addEventListener("fullscreenchange", updateFullscreenButton);
+
+function runShortcut(event, action) {
+  event.preventDefault();
+  action();
+}
 
 document.addEventListener("keydown", (event) => {
   const tag = event.target.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
-    event.preventDefault();
-    copySelection();
-  }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "v") {
-    event.preventDefault();
-    pasteSelection();
-  }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
-    event.preventDefault();
-    duplicateSelection();
-  }
+  const isTyping = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || event.target.isContentEditable;
+  if (isTyping) return;
+
+  const key = event.key.toLowerCase();
+  const commandKey = event.ctrlKey || event.metaKey;
+
+  if (commandKey && event.shiftKey && key === "s") return runShortcut(event, saveRecordAs);
+  if (commandKey && event.shiftKey && key === "c") return runShortcut(event, copyImageToClipboard);
+  if (commandKey && event.shiftKey && key === "f") return runShortcut(event, toggleFullscreen);
+
+  if (commandKey && key === "s") return runShortcut(event, saveRecordChanges);
+  if (commandKey && key === "o") return runShortcut(event, openCloudRecord);
+  if (commandKey && key === "n") return runShortcut(event, newDiagram);
+  if (commandKey && key === "p") return runShortcut(event, exportToPDF);
+  if (commandKey && key === "c") return runShortcut(event, copySelection);
+  if (commandKey && key === "v") return runShortcut(event, pasteSelection);
+  if (commandKey && key === "d") return runShortcut(event, duplicateSelection);
+  if (commandKey && key === "e") return runShortcut(event, () => document.getElementById("selectAreaBtn").click());
+  if (commandKey && key === "l") return runShortcut(event, () => document.getElementById("connectBtn").click());
+  if (commandKey && key === "f") return runShortcut(event, fitToDiagram);
+  if (commandKey && key === "0") return runShortcut(event, resetZoom);
+  if (commandKey && (key === "+" || key === "=")) return runShortcut(event, () => zoomAt(1.18));
+  if (commandKey && key === "-") return runShortcut(event, () => zoomAt(0.85));
+
+  if (event.key === "Delete" || event.key === "Backspace") return runShortcut(event, deleteSelection);
+  if (event.key === "Escape") return runShortcut(event, () => {
+    connectMode = false;
+    connectFrom = null;
+    selectMode = false;
+    document.getElementById("connectBtn").classList.add("ghost");
+    document.getElementById("selectAreaBtn").classList.remove("active");
+    setStatus("Modo cancelado");
+    render();
+  });
 });
 
 
@@ -1626,6 +1795,7 @@ if ("serviceWorker" in navigator) {
 }
 
 if (appVersionBadge) appVersionBadge.textContent = `v${appVersion}`;
+updateSessionUI();
 drawGrid();
 load();
 ensureHeader();
@@ -1635,4 +1805,21 @@ syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

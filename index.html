@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -7,7 +7,7 @@
     <title>Flujos SGI</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=0.1.6" />
+    <link rel="stylesheet" href="styles.css?v=0.2.6" />
   </head>
   <body>
     <header class="topbar">
@@ -18,12 +18,23 @@
           <p>Diagramas de flujo para tu proceso</p>
         </div>
       </div>
-      <div class="actions">
-        <button id="newDiagramBtn" class="ghost">Nuevo</button>
-        <button id="openRecordBtn" class="ghost">Abrir</button>
-        <button id="saveAsBtn">Guardar como</button>
-        <button id="saveBtn">Guardar cambios</button>
-        <button id="exportPdfBtn" class="ghost">PDF</button>
+
+      <div class="session-box" aria-label="Sesion de usuario">
+        <span id="currentUserLabel" class="session-label">Sin sesion</span>
+        <select id="userSelect" class="session-select" aria-label="Seleccionar usuario">
+          <option value="">Seleccionar usuario</option>
+          <option value="Hermenegildo Pérez">Hermenegildo Pérez</option>
+          <option value="Alicia Torres">Alicia Torres</option>
+          <option value="Omar Martínez">Omar Martínez</option>
+        </select>
+      </div>
+
+      <div class="hidden-command-buttons" aria-hidden="true">
+        <button id="newDiagramBtn" class="ghost" type="button">Nuevo</button>
+        <button id="openRecordBtn" class="ghost" type="button">Abrir</button>
+        <button id="saveAsBtn" type="button">Guardar como</button>
+        <button id="saveBtn" type="button">Guardar cambios</button>
+        <button id="exportPdfBtn" class="ghost" type="button">PDF</button>
       </div>
     </header>
 
@@ -40,6 +51,14 @@
               <span class="shape-icon icon-process"></span>
               <span>Proceso</span>
             </button>
+            <button class="shape-tool shape-card" data-shape="subprocess" title="Subproceso" aria-label="Subproceso">
+              <span class="shape-icon icon-subprocess"></span>
+              <span>Subproceso</span>
+            </button>
+            <button class="shape-tool shape-card" data-shape="data" title="Datos" aria-label="Datos">
+              <span class="shape-icon icon-data"></span>
+              <span>Datos</span>
+            </button>
             <button class="shape-tool shape-card" data-shape="decision" title="Decision" aria-label="Decision">
               <span class="shape-icon icon-decision"></span>
               <span>Decision</span>
@@ -55,20 +74,15 @@
           </div>
         </section>
 
-        <section>
-          <h2>Edicion</h2>
-          <div class="action-grid">
-            <button id="selectAreaBtn" class="ghost">Seleccionar</button>
-            <button id="connectBtn">Conectar</button>
-            <button id="copyBtn" class="ghost">Copiar</button>
-            <button id="pasteBtn" class="ghost">Pegar</button>
-            <button id="duplicateBtn" class="ghost">Duplicar</button>
-            <button id="copyImageBtn" class="ghost">Imagen</button>
-          </div>
-          <div class="stack-actions">
-            <button id="deleteBtn" class="wide danger">Eliminar seleccionado</button>
-            <button id="clearBtn" class="wide ghost">Nuevo diagrama</button>
-          </div>
+        <section class="hidden-command-buttons" aria-hidden="true">
+          <button id="selectAreaBtn" class="ghost" type="button">Seleccionar</button>
+          <button id="connectBtn" type="button">Conectar</button>
+          <button id="copyBtn" class="ghost" type="button">Copiar</button>
+          <button id="pasteBtn" class="ghost" type="button">Pegar</button>
+          <button id="duplicateBtn" class="ghost" type="button">Duplicar</button>
+          <button id="copyImageBtn" class="ghost" type="button">Imagen</button>
+          <button id="deleteBtn" class="wide danger" type="button">Eliminar seleccionado</button>
+          <button id="clearBtn" class="wide ghost" type="button">Nuevo diagrama</button>
         </section>
 
         <section>
@@ -125,6 +139,40 @@
       <section class="canvas-wrap" aria-label="Area de diagrama">
         <div class="canvas-toolbar">
           <input id="diagramTitle" type="text" value="Proceso del SGI" aria-label="Titulo del diagrama" />
+          <nav class="menu-bar canvas-menu" aria-label="Menu principal">
+            <div class="menu">
+              <button class="menu-trigger ghost" type="button"><span class="cmd-icon cmd-file" aria-hidden="true"></span><span>Archivo</span></button>
+              <div class="menu-dropdown">
+                <button type="button" data-command="newDiagramBtn"><span class="cmd-icon cmd-new" aria-hidden="true"></span><span>Nuevo</span><kbd>Ctrl+N</kbd></button>
+                <button type="button" data-command="openRecordBtn"><span class="cmd-icon cmd-open" aria-hidden="true"></span><span>Abrir</span><kbd>Ctrl+O</kbd></button>
+                <button type="button" data-command="saveAsBtn"><span class="cmd-icon cmd-save-as" aria-hidden="true"></span><span>Guardar como</span><kbd>Ctrl+Shift+S</kbd></button>
+                <button type="button" data-command="saveBtn"><span class="cmd-icon cmd-save" aria-hidden="true"></span><span>Guardar cambios</span><kbd>Ctrl+S</kbd></button>
+                <button type="button" data-command="exportPdfBtn"><span class="cmd-icon cmd-pdf" aria-hidden="true"></span><span>Exportar PDF</span><kbd>Ctrl+P</kbd></button>
+              </div>
+            </div>
+            <div class="menu">
+              <button class="menu-trigger ghost" type="button"><span class="cmd-icon cmd-edit" aria-hidden="true"></span><span>Edicion</span></button>
+              <div class="menu-dropdown">
+                <button type="button" data-command="selectAreaBtn"><span class="cmd-icon cmd-select" aria-hidden="true"></span><span>Seleccionar</span><kbd>Ctrl+E</kbd></button>
+                <button type="button" data-command="connectBtn"><span class="cmd-icon cmd-connect" aria-hidden="true"></span><span>Conectar</span><kbd>Ctrl+L</kbd></button>
+                <button type="button" data-command="copyBtn"><span class="cmd-icon cmd-copy" aria-hidden="true"></span><span>Copiar</span><kbd>Ctrl+C</kbd></button>
+                <button type="button" data-command="pasteBtn"><span class="cmd-icon cmd-paste" aria-hidden="true"></span><span>Pegar</span><kbd>Ctrl+V</kbd></button>
+                <button type="button" data-command="duplicateBtn"><span class="cmd-icon cmd-duplicate" aria-hidden="true"></span><span>Duplicar</span><kbd>Ctrl+D</kbd></button>
+                <button type="button" data-command="copyImageBtn"><span class="cmd-icon cmd-image" aria-hidden="true"></span><span>Copiar imagen</span><kbd>Ctrl+Shift+C</kbd></button>
+                <button type="button" data-command="deleteBtn"><span class="cmd-icon cmd-delete" aria-hidden="true"></span><span>Eliminar seleccionado</span><kbd>Supr</kbd></button>
+              </div>
+            </div>
+            <div class="menu">
+              <button class="menu-trigger ghost" type="button"><span class="cmd-icon cmd-theme" aria-hidden="true"></span><span>Temas</span></button>
+              <div class="menu-dropdown theme-dropdown">
+                <button type="button" data-theme="sgi"><span class="theme-swatch swatch-sgi" aria-hidden="true"></span><span>SGI verde</span></button>
+                <button type="button" data-theme="blue"><span class="theme-swatch swatch-blue" aria-hidden="true"></span><span>Azul</span></button>
+                <button type="button" data-theme="amber"><span class="theme-swatch swatch-amber" aria-hidden="true"></span><span>Ambar</span></button>
+                <button type="button" data-theme="slate"><span class="theme-swatch swatch-slate" aria-hidden="true"></span><span>Grafito</span></button>
+                <button type="button" data-theme="rose"><span class="theme-swatch swatch-rose" aria-hidden="true"></span><span>Vino</span></button>
+              </div>
+            </div>
+          </nav>
           <div class="workspace-tools" aria-label="Controles de vista">
             <button id="zoomOutBtn" class="icon-button ghost" title="Alejar" aria-label="Alejar">-</button>
             <span id="zoomLevel" class="zoom-level">100%</span>
@@ -144,7 +192,7 @@
               <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity=".16" />
             </filter>
           </defs>
-          <text class="watermark" x="4740" y="3160" text-anchor="end">Desarrollado por: Hermenegildo P&eacute;rez</text>
+          <text class="watermark" x="15940" y="10360" text-anchor="end">Desarrollado por: Hermenegildo P&eacute;rez</text>
           <g id="gridLayer"></g>
           <g id="headerLayer"></g>
           <g id="laneLayer"></g>
@@ -171,6 +219,8 @@
             <select id="nodeShape">
               <option value="terminator">Inicio / Fin</option>
               <option value="process">Proceso</option>
+              <option value="subprocess">Subproceso</option>
+              <option value="data">Datos</option>
               <option value="decision">Decision</option>
               <option value="document">Documento</option>
               <option value="text">Cuadro de texto</option>
@@ -180,7 +230,7 @@
 
         <section>
           <h2>Uso rapido</h2>
-          <p class="hint">Arrastra figuras para moverlas. Usa "Seleccionar area" para copiar varias figuras. Ctrl+C copia, Ctrl+V pega y "Copiar imagen" prepara el flujo para Excel o PowerPoint.</p>
+          <p class="hint">Atajos: Ctrl+S guarda, Ctrl+O abre, Ctrl+N crea uno nuevo, Ctrl+C copia, Ctrl+V pega, Ctrl+D duplica, Supr elimina, Ctrl+P exporta PDF y Ctrl+F encaja el flujo.</p>
         </section>
       </aside>
     </main>
@@ -198,7 +248,17 @@
   </div>
 </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="app.js?v=0.1.6"></script>
-    <script type="module" src="firebase-init.js?v=0.1.6"></script>
+    <script src="app.js?v=0.2.6"></script>
+    <script type="module" src="firebase-init.js?v=0.2.6"></script>
   </body>
 </html>
+
+
+
+
+
+
+
+
+
+
