@@ -1159,15 +1159,20 @@ select {
 
 .modal-content {
   background: white;
-  padding: 20px;
   border-radius: 10px;
-  width: 350px;
+  max-width: calc(100vw - 40px);
+  padding: 20px;
+  width: min(760px, 92vw);
 }
 
 #recordsSelect {
-  width: 100%;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: var(--font-sm);
+  height: 320px;
   margin: 10px 0;
-  height: 200px;
+  overflow-x: auto;
+  white-space: nowrap;
+  width: 100%;
 }
 
 .modal-actions {
@@ -1175,6 +1180,7 @@ select {
   justify-content: flex-end;
   gap: 10px;
 }
+
 
 
 

@@ -29,7 +29,7 @@ const appVersionBadge = document.getElementById("appVersion");
 const currentUserLabel = document.getElementById("currentUserLabel");
 const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.2.6";
+const appVersion = "0.2.8";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -80,6 +80,9 @@ let connectFrom = null;
 let deferredInstall = null;
 let view = { ...defaultView };
 let internalClipboard = null;
+let undoStack = [];
+let lastStateSnapshot = "";
+let historyPaused = false;
 let currentRecordId = localStorage.getItem(currentRecordKey) || "";
 let sessionUser = localStorage.getItem(sessionUserKey) || "";
 if (sessionUser === "Hermenegildo Perez") sessionUser = "Hermenegildo Pérez";
@@ -1129,9 +1132,50 @@ function addNode(shape, x = 680, y = 360, text = "Nueva actividad", owner = "") 
   render();
 }
 
+function stateSnapshotText() {
+  return JSON.stringify(state);
+}
+
+function rememberState(currentSnapshot) {
+  if (historyPaused || !lastStateSnapshot || currentSnapshot === lastStateSnapshot) return;
+  undoStack.push(lastStateSnapshot);
+  if (undoStack.length > 80) undoStack.shift();
+}
+
+function resetUndoHistory() {
+  undoStack = [];
+  lastStateSnapshot = stateSnapshotText();
+}
+
+function undoLastChange() {
+  const previous = undoStack.pop();
+  if (!previous) {
+    setStatus("No hay cambios para deshacer");
+    return;
+  }
+  historyPaused = true;
+  state = JSON.parse(previous);
+  ensureHeader();
+  ensureLanes();
+  ensureTheme();
+  clearSelection();
+  titleInput.value = state.title || "Diagrama sin titulo";
+  localStorage.setItem(storeKey, previous);
+  lastStateSnapshot = previous;
+  syncHeaderControls();
+  syncLaneControls();
+  syncProperties();
+  render();
+  historyPaused = false;
+  setStatus("Cambio deshecho");
+}
+
 function save() {
   state.title = titleInput.value || "Diagrama sin titulo";
-  localStorage.setItem(storeKey, JSON.stringify(state));
+  const currentSnapshot = stateSnapshotText();
+  rememberState(currentSnapshot);
+  lastStateSnapshot = currentSnapshot;
+  localStorage.setItem(storeKey, currentSnapshot);
 }
 
 function diagramSnapshot() {
@@ -1147,7 +1191,10 @@ function applyDiagramData(data) {
   ensureTheme();
   clearSelection();
   titleInput.value = state.title || "Diagrama sin titulo";
+  historyPaused = true;
   save();
+  historyPaused = false;
+  resetUndoHistory();
   syncHeaderControls();
   syncLaneControls();
   syncProperties();
@@ -1719,6 +1766,8 @@ document.addEventListener("keydown", (event) => {
   const key = event.key.toLowerCase();
   const commandKey = event.ctrlKey || event.metaKey;
 
+  if (commandKey && key === "z") return runShortcut(event, undoLastChange);
+
   if (commandKey && event.shiftKey && key === "s") return runShortcut(event, saveRecordAs);
   if (commandKey && event.shiftKey && key === "c") return runShortcut(event, copyImageToClipboard);
   if (commandKey && event.shiftKey && key === "f") return runShortcut(event, toggleFullscreen);
@@ -1800,11 +1849,17 @@ drawGrid();
 load();
 ensureHeader();
 ensureLanes();
+ensureTheme();
+resetUndoHistory();
 syncHeaderControls();
 syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
+
+
+
 
 
 
