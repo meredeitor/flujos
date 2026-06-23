@@ -27,7 +27,7 @@ const headerLeftLogoInput = document.getElementById("headerLeftLogoInput");
 const headerRightLogoInput = document.getElementById("headerRightLogoInput");
 const appVersionBadge = document.getElementById("appVersion");
 
-const appVersion = "0.1.5";
+const appVersion = "0.1.6";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";

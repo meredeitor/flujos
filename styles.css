@@ -222,6 +222,100 @@ h2 {
 .compact-grid button {
   font-size: var(--font-xs);
 }
+.shape-palette {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.shape-card {
+  align-items: center;
+  background: #f8fffd;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  display: grid;
+  gap: 7px;
+  min-height: 78px;
+  padding: 8px 6px;
+}
+
+.shape-card:hover {
+  background: #ecfdf8;
+  border-color: #8dd8cd;
+}
+
+.shape-card span:last-child {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.shape-icon {
+  display: block;
+  height: 34px;
+  justify-self: center;
+  position: relative;
+  width: 58px;
+}
+
+.icon-terminator {
+  background: #e8f7f3;
+  border: 2px solid #0f766e;
+  border-radius: 999px;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, .14);
+}
+
+.icon-process {
+  background: #ffffff;
+  border: 2px solid #0f766e;
+  border-radius: 5px;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, .14);
+}
+
+.icon-decision::before {
+  background: #fff7ed;
+  border: 2px solid #f59e0b;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, .12);
+  content: "";
+  height: 28px;
+  left: 14px;
+  position: absolute;
+  top: 2px;
+  transform: rotate(45deg);
+  width: 28px;
+}
+
+.icon-document {
+  background: #eff6ff;
+  border: 2px solid #0f766e;
+  border-radius: 5px 5px 12px 12px;
+  box-shadow: 0 5px 12px rgba(15, 23, 42, .14);
+}
+
+.icon-document::after {
+  border-bottom: 2px solid #0f766e;
+  border-radius: 50%;
+  bottom: 3px;
+  content: "";
+  height: 12px;
+  left: 7px;
+  position: absolute;
+  width: 44px;
+}
+
+.icon-text {
+  border-bottom: 2px dashed #0f766e;
+  color: #0f766e;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 34px;
+  text-align: center;
+}
+
+.icon-text::before {
+  content: "T";
+}
 
 .stack-actions {
   display: grid;

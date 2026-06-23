@@ -7,7 +7,7 @@
     <title>Flujos SGI</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=0.1.5" />
+    <link rel="stylesheet" href="styles.css?v=0.1.6" />
   </head>
   <body>
     <header class="topbar">
@@ -31,12 +31,27 @@
       <aside class="panel left-panel" aria-label="Herramientas">
         <section>
           <h2>Figuras</h2>
-          <div class="tool-grid compact-grid">
-            <button class="shape-tool" data-shape="terminator">Inicio / Fin</button>
-            <button class="shape-tool" data-shape="process">Proceso</button>
-            <button class="shape-tool" data-shape="decision">Decision</button>
-            <button class="shape-tool" data-shape="document">Documento</button>
-            <button class="shape-tool" data-shape="text">Cuadro texto</button>
+          <div class="shape-palette" aria-label="Galeria de figuras">
+            <button class="shape-tool shape-card" data-shape="terminator" title="Inicio / Fin" aria-label="Inicio / Fin">
+              <span class="shape-icon icon-terminator"></span>
+              <span>Inicio / Fin</span>
+            </button>
+            <button class="shape-tool shape-card" data-shape="process" title="Proceso" aria-label="Proceso">
+              <span class="shape-icon icon-process"></span>
+              <span>Proceso</span>
+            </button>
+            <button class="shape-tool shape-card" data-shape="decision" title="Decision" aria-label="Decision">
+              <span class="shape-icon icon-decision"></span>
+              <span>Decision</span>
+            </button>
+            <button class="shape-tool shape-card" data-shape="document" title="Documento" aria-label="Documento">
+              <span class="shape-icon icon-document"></span>
+              <span>Documento</span>
+            </button>
+            <button class="shape-tool shape-card" data-shape="text" title="Cuadro texto" aria-label="Cuadro texto">
+              <span class="shape-icon icon-text"></span>
+              <span>Texto</span>
+            </button>
           </div>
         </section>
 
@@ -183,7 +198,7 @@
   </div>
 </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="app.js?v=0.1.5"></script>
-    <script type="module" src="firebase-init.js?v=0.1.5"></script>
+    <script src="app.js?v=0.1.6"></script>
+    <script type="module" src="firebase-init.js?v=0.1.6"></script>
   </body>
 </html>

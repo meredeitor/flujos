@@ -1,4 +1,4 @@
-const CACHE_NAME = "flujos-sgc-v37";
+const CACHE_NAME = "flujos-sgc-v38";
 const ASSETS = [
   "./",
   "./index.html",
