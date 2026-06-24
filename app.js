@@ -29,7 +29,7 @@ const appVersionBadge = document.getElementById("appVersion");
 const currentUserLabel = document.getElementById("currentUserLabel");
 const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.2.8";
+const appVersion = "0.3.2";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -271,9 +271,24 @@ function renderHeader(targetLayer = headerLayer, options = {}) {
   group.appendChild(createSvg("text", { class: "doc-header-period-text", x: x + w - 130, y: y + topH + headerLayout.gap + 46, "text-anchor": "middle" })).textContent = state.header.period;
   targetLayer.appendChild(group);
 }
+function laneContentExtent(axis) {
+  if (!Array.isArray(state.nodes) || !state.nodes.length) return 0;
+  return state.nodes.reduce((max, node) => {
+    const bounds = nodeBounds(node);
+    return Math.max(max, axis === "x" ? bounds.x + bounds.w : bounds.y + bounds.h);
+  }, 0);
+}
+
 function laneTotalSize() {
   ensureHeader();
-  return state.lanes?.orientation === "vertical" ? workspace.w : workspace.h - headerReservedHeight();
+  const count = Math.max(1, state.lanes?.names?.length || 1);
+  if (state.lanes?.orientation === "vertical") {
+    const minimumByLanes = count * 720;
+    const minimumByHeader = state.header?.enabled ? headerLayout.x + headerLayout.w + 420 : 0;
+    const minimumByContent = laneContentExtent("x") + 720;
+    return Math.min(workspace.w, Math.max(minimumByLanes, minimumByHeader, minimumByContent, defaultView.w));
+  }
+  return workspace.h - headerReservedHeight();
 }
 
 function normalizeLaneSizes() {
@@ -516,24 +531,92 @@ function connectionPoint(node, side) {
   return { x: center.x, y: node.y + size.h };
 }
 
-function edgePath(from, to) {
+function automaticConnectionSides(from, to) {
   const fromCenter = centerOf(from);
   const toCenter = centerOf(to);
   const dx = toCenter.x - fromCenter.x;
   const dy = toCenter.y - fromCenter.y;
   const vertical = Math.abs(dy) > Math.abs(dx);
-  const fromSide = vertical ? (dy >= 0 ? "bottom" : "top") : (dx >= 0 ? "right" : "left");
-  const toSide = vertical ? (dy >= 0 ? "top" : "bottom") : (dx >= 0 ? "left" : "right");
+  return {
+    fromSide: vertical ? (dy >= 0 ? "bottom" : "top") : (dx >= 0 ? "right" : "left"),
+    toSide: vertical ? (dy >= 0 ? "top" : "bottom") : (dx >= 0 ? "left" : "right"),
+  };
+}
+
+function edgeConnectionSides(edge, from, to) {
+  const auto = automaticConnectionSides(from, to);
+  return {
+    fromSide: edge?.fromSide || auto.fromSide,
+    toSide: edge?.toSide || auto.toSide,
+  };
+}
+
+function sideDirection(side) {
+  if (side === "left") return { x: -1, y: 0 };
+  if (side === "right") return { x: 1, y: 0 };
+  if (side === "top") return { x: 0, y: -1 };
+  return { x: 0, y: 1 };
+}
+
+function edgePath(from, to, edge = null) {
+  const { fromSide, toSide } = edgeConnectionSides(edge, from, to);
   const a = connectionPoint(from, fromSide);
   const b = connectionPoint(to, toSide);
-  if (vertical) {
-    const curve = Math.max(60, Math.min(180, Math.abs(b.y - a.y) * 0.35));
-    const direction = Math.sign(b.y - a.y || 1);
+  const verticalFlow = (fromSide === "bottom" && toSide === "top") || (fromSide === "top" && toSide === "bottom");
+  const horizontalFlow = (fromSide === "right" && toSide === "left") || (fromSide === "left" && toSide === "right");
+  if (verticalFlow) {
+    const distance = Math.abs(b.y - a.y);
+    const curve = Math.max(24, Math.min(90, distance * 0.28));
+    const direction = Math.sign(b.y - a.y || (fromSide === "bottom" ? 1 : -1));
     return `M ${a.x} ${a.y} C ${a.x} ${a.y + direction * curve}, ${b.x} ${b.y - direction * curve}, ${b.x} ${b.y}`;
   }
-  const curve = Math.max(60, Math.min(180, Math.abs(b.x - a.x) * 0.35));
-  const direction = Math.sign(b.x - a.x || 1);
-  return `M ${a.x} ${a.y} C ${a.x + direction * curve} ${a.y}, ${b.x - direction * curve} ${b.y}, ${b.x} ${b.y}`;
+  if (horizontalFlow) {
+    const distance = Math.abs(b.x - a.x);
+    const curve = Math.max(24, Math.min(100, distance * 0.28));
+    const direction = Math.sign(b.x - a.x || (fromSide === "right" ? 1 : -1));
+    return `M ${a.x} ${a.y} C ${a.x + direction * curve} ${a.y}, ${b.x - direction * curve} ${b.y}, ${b.x} ${b.y}`;
+  }
+  const fromDirection = sideDirection(fromSide);
+  const toDirection = sideDirection(toSide);
+  const curve = Math.max(55, Math.min(160, Math.hypot(b.x - a.x, b.y - a.y) * 0.2));
+  const c1 = { x: a.x + fromDirection.x * curve, y: a.y + fromDirection.y * curve };
+  const c2 = { x: b.x + toDirection.x * curve, y: b.y + toDirection.y * curve };
+  return `M ${a.x} ${a.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${b.x} ${b.y}`;
+}
+
+function renderEdgeAnchors(edge, from, to) {
+  const sides = ["top", "right", "bottom", "left"];
+  const { fromSide, toSide } = edgeConnectionSides(edge, from, to);
+  [{ node: from, end: "from", active: fromSide }, { node: to, end: "to", active: toSide }].forEach((item) => {
+    sides.forEach((side) => {
+      const point = connectionPoint(item.node, side);
+      const group = createSvg("g", { class: `edge-anchor-group${side === item.active ? " active" : ""}` });
+      const hitArea = createSvg("circle", {
+        class: "edge-anchor-hit",
+        cx: point.x,
+        cy: point.y,
+        r: 34,
+        "data-edge-end": item.end,
+        "data-edge-side": side,
+      });
+      const visibleHandle = createSvg("circle", {
+        class: "edge-anchor",
+        cx: point.x,
+        cy: point.y,
+        r: 14,
+      });
+      group.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        edge[`${item.end}Side`] = side;
+        save();
+        render();
+        setStatus(`Conexion ajustada al lado ${side}`);
+      });
+      group.appendChild(hitArea);
+      group.appendChild(visibleHandle);
+      edgeLayer.appendChild(group);
+    });
+  });
 }
 
 function nodeBounds(node) {
@@ -712,7 +795,7 @@ function render() {
     const b = centerOf(to);
     const edgeEl = createSvg("path", {
       class: `edge${edge.id === selectedEdgeId ? " selected" : ""}`,
-      d: edgePath(from, to),
+      d: edgePath(from, to, edge),
       "data-edge-id": edge.id,
     });
     edgeEl.addEventListener("pointerdown", (event) => {
@@ -724,6 +807,7 @@ function render() {
       render();
     });
     edgeLayer.appendChild(edgeEl);
+    if (edge.id === selectedEdgeId) renderEdgeAnchors(edge, from, to);
   });
 
   state.nodes.forEach((node) => {
@@ -909,7 +993,7 @@ function svgForSelection() {
     const from = nodes.find((node) => node.id === edge.from);
     const to = nodes.find((node) => node.id === edge.to);
     if (!from || !to) return;
-    copyEdges.appendChild(createSvg("path", { class: "edge", d: edgePath(from, to) }));
+    copyEdges.appendChild(createSvg("path", { class: "edge", d: edgePath(from, to, edge) }));
   });
   nodes.forEach((node) => {
     const size = getNodeSize(node);
@@ -1856,6 +1940,10 @@ syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
+
+
+
 
 
 

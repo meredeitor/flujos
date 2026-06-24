@@ -1094,6 +1094,30 @@ select {
   stroke: #f59e0b;
 }
 
+.edge-anchor-group {
+  cursor: crosshair;
+}
+
+.edge-anchor-hit {
+  fill: transparent;
+  pointer-events: all;
+  stroke: transparent;
+}
+
+.edge-anchor {
+  fill: #ffffff;
+  pointer-events: none;
+  stroke: #334155;
+  stroke-width: 3;
+}
+
+.edge-anchor-group:hover .edge-anchor,
+.edge-anchor-group.active .edge-anchor {
+  fill: #fef3c7;
+  stroke: #f59e0b;
+  stroke-width: 4;
+}
+
 .owner {
   fill: #64748b;
   font-size: 18px;
@@ -1180,6 +1204,8 @@ select {
   justify-content: flex-end;
   gap: 10px;
 }
+
+
 
 
 
