@@ -30,7 +30,7 @@ const appVersionBadge = document.getElementById("appVersion");
 const currentUserLabel = document.getElementById("currentUserLabel");
 const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.3.5";
+const appVersion = "0.3.6";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -1077,11 +1077,12 @@ function svgForFullDiagram() {
   const clone = svg.cloneNode(true);
   clone.querySelectorAll(".selected").forEach((el) => el.classList.remove("selected"));
   clone.querySelectorAll(".lane-resize-handle").forEach((el) => el.remove());
+  clone.querySelector("#gridLayer")?.remove();
   clone.setAttribute("xmlns", NS);
   clone.setAttribute("viewBox", `${box.x} ${box.y} ${box.w} ${box.h}`);
   clone.setAttribute("width", box.w);
   clone.setAttribute("height", box.h);
-  clone.insertBefore(createSvg("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: "#eef6f4" }), clone.firstChild);
+  clone.insertBefore(createSvg("rect", { x: box.x, y: box.y, width: box.w, height: box.h, fill: "#ffffff" }), clone.firstChild);
   clone.insertBefore(createSvg("style"), clone.firstChild).textContent = exportSvgStyleText();
   return {
     text: new XMLSerializer().serializeToString(clone),
@@ -1102,7 +1103,7 @@ function svgToJpegDataUrl(svgText, width, height) {
       canvas.width = Math.max(1, Math.round(width * scale));
       canvas.height = Math.max(1, Math.round(height * scale));
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#eef6f4";
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
@@ -1960,6 +1961,7 @@ syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
 
 
 
