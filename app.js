@@ -30,7 +30,7 @@ const appVersionBadge = document.getElementById("appVersion");
 const currentUserLabel = document.getElementById("currentUserLabel");
 const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.3.4";
+const appVersion = "0.3.5";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -284,6 +284,8 @@ function laneTotalSize() {
   ensureHeader();
   const count = Math.max(1, state.lanes?.names?.length || 1);
   if (state.lanes?.orientation === "vertical") {
+    const current = Array.isArray(state.lanes.sizes) ? state.lanes.sizes.map(Number).filter((size) => Number.isFinite(size) && size > 0) : [];
+    if (current.length === count) return Math.min(workspace.w, current.reduce((acc, size) => acc + size, 0));
     const minimumByLanes = count * 420;
     const minimumByHeader = state.header?.enabled ? headerLayout.x + headerLayout.w + 260 : 0;
     const minimumByContent = laneContentExtent("x") + 360;
@@ -1639,6 +1641,7 @@ laneNamesInput.addEventListener("input", () => {
 });
 lanesHorizontalBtn.addEventListener("click", () => {
   ensureLanes();
+  if (state.lanes.orientation !== "horizontal") state.lanes.sizes = [];
   state.lanes.orientation = "horizontal";
   state.lanes.enabled = true;
   normalizeLaneSizes();
@@ -1648,6 +1651,7 @@ lanesHorizontalBtn.addEventListener("click", () => {
 });
 lanesVerticalBtn.addEventListener("click", () => {
   ensureLanes();
+  if (state.lanes.orientation !== "vertical") state.lanes.sizes = [];
   state.lanes.orientation = "vertical";
   state.lanes.enabled = true;
   normalizeLaneSizes();
@@ -1956,6 +1960,7 @@ syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
 
 
 

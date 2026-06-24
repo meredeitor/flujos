@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "flujos-sgc-v56";
+﻿const CACHE_NAME = "flujos-sgc-v57";
 const ASSETS = [
   "./",
   "./index.html",
@@ -33,6 +33,7 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
 
 
 
