@@ -29,7 +29,7 @@ const appVersionBadge = document.getElementById("appVersion");
 const currentUserLabel = document.getElementById("currentUserLabel");
 const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.3.2";
+const appVersion = "0.3.3";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -283,9 +283,9 @@ function laneTotalSize() {
   ensureHeader();
   const count = Math.max(1, state.lanes?.names?.length || 1);
   if (state.lanes?.orientation === "vertical") {
-    const minimumByLanes = count * 720;
-    const minimumByHeader = state.header?.enabled ? headerLayout.x + headerLayout.w + 420 : 0;
-    const minimumByContent = laneContentExtent("x") + 720;
+    const minimumByLanes = count * 420;
+    const minimumByHeader = state.header?.enabled ? headerLayout.x + headerLayout.w + 260 : 0;
+    const minimumByContent = laneContentExtent("x") + 360;
     return Math.min(workspace.w, Math.max(minimumByLanes, minimumByHeader, minimumByContent, defaultView.w));
   }
   return workspace.h - headerReservedHeight();
@@ -1940,6 +1940,7 @@ syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
 
 
 
