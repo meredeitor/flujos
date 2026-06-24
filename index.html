@@ -7,7 +7,7 @@
     <title>Flujos SGI</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=0.3.3" />
+    <link rel="stylesheet" href="styles.css?v=0.3.4" />
   </head>
   <body>
     <header class="topbar">
@@ -226,6 +226,10 @@
               <option value="text">Cuadro de texto</option>
             </select>
           </label>
+          <label>
+            Ancho
+            <input id="nodeWidth" type="number" min="120" max="1200" step="10" placeholder="Selecciona una figura" />
+          </label>
         </section>
 
         <section>
@@ -248,10 +252,11 @@
   </div>
 </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="app.js?v=0.3.3"></script>
-    <script type="module" src="firebase-init.js?v=0.3.3"></script>
+    <script src="app.js?v=0.3.4"></script>
+    <script type="module" src="firebase-init.js?v=0.3.4"></script>
   </body>
 </html>
+
 
 
 

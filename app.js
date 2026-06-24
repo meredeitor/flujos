@@ -11,6 +11,7 @@ const zoomLevel = document.getElementById("zoomLevel");
 const nodeText = document.getElementById("nodeText");
 const nodeOwner = document.getElementById("nodeOwner");
 const nodeShape = document.getElementById("nodeShape");
+const nodeWidth = document.getElementById("nodeWidth");
 const lanesEnabledInput = document.getElementById("lanesEnabled");
 const laneNamesInput = document.getElementById("laneNames");
 const lanesHorizontalBtn = document.getElementById("lanesHorizontalBtn");
@@ -29,7 +30,7 @@ const appVersionBadge = document.getElementById("appVersion");
 const currentUserLabel = document.getElementById("currentUserLabel");
 const userSelect = document.getElementById("userSelect");
 
-const appVersion = "0.3.3";
+const appVersion = "0.3.4";
 const NS = "http://www.w3.org/2000/svg";
 const storeKey = "flujos-sgc-diagram-v1";
 const currentRecordKey = "flujos-sgc-current-record-v1";
@@ -894,9 +895,11 @@ function syncProperties() {
   nodeText.disabled = !node || multiple;
   nodeOwner.disabled = !node || multiple;
   nodeShape.disabled = !node || multiple;
+  nodeWidth.disabled = !node || multiple;
   nodeText.value = node && !multiple ? node.text : "";
   nodeOwner.value = node && !multiple ? node.owner || "" : "";
   nodeShape.value = node && !multiple ? node.shape : "process";
+  nodeWidth.value = node && !multiple ? Math.round(getNodeSize(node).w) : "";
 }
 
 function copySelection() {
@@ -1695,6 +1698,19 @@ nodeShape.addEventListener("change", () => {
   const node = state.nodes.find((item) => item.id === selectedNodeId);
   if (node) {
     node.shape = nodeShape.value;
+    if (node.shape === "text") node.owner = "";
+    save();
+    syncProperties();
+    render();
+  }
+});
+
+nodeWidth.addEventListener("input", () => {
+  const node = state.nodes.find((item) => item.id === selectedNodeId);
+  if (node) {
+    const width = Number(nodeWidth.value);
+    if (!Number.isFinite(width)) return;
+    node.w = clamp(width, 120, 1200);
     save();
     render();
   }
@@ -1940,6 +1956,7 @@ syncLaneControls();
 setViewBox(defaultView);
 syncProperties();
 render();
+
 
 
 
